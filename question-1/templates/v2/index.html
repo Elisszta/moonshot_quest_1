@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Phase 2 - Semantic</title>
+</head>
+<body>
+    <h1>On-Call Assistant Search (Phase 2)</h1>
+    <form id="search-form">
+        <input type="text" id="q" name="q" placeholder="Semantic Search...">
+        <button type="submit">Search</button>
+    </form>
+    <div id="results"></div>
+
+    <script>
+        document.getElementById('search-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const q = document.getElementById('q').value;
+            const res = await fetch(`/v2/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+            for (const r of data.results) {
+                resultsDiv.innerHTML += `<div>
+                    <h3>${r.title} (${r.id})</h3>
+                    <p>${r.snippet}</p>
+                    <small>Reranker Score: ${r.score} | RRF Score: ${r.rrf_score}</small>
+                </div>`;
+            }
+        });
+    </script>
+</body>
+</html>
