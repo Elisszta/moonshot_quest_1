@@ -1,0 +1,6 @@
+{
+  "api_key": "sk-oumsM1OZh9iSgw3Mdge6oKFkjOliCbK7LclMe42czkLJjqmg",
+  "base_url": "https://api.chatanywhere.tech/v1",
+  "model": "gpt-4o-mini",
+  "use_embedding_search": false
+}

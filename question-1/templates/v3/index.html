@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>On-Call 助手 Agent</title>
+    <!-- TailwindCSS for quick styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Modern scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .typing-indicator span {
+            animation: blink 1.4s infinite both;
+            height: 6px; width: 6px; background-color: #94a3b8; border-radius: 50%; display: inline-block; margin: 0 1px;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink { 0% { opacity: 0.2; } 20% { opacity: 1; } 100% { opacity: 0.2; } }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen flex flex-col font-sans">
+
+    <!-- Header & Config -->
+    <header class="bg-white shadow-sm shrink-0 border-b border-gray-200">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-gray-800 flex items-center">
+                <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                On-Call 智能助手
+            </h1>
+            <button onclick="toggleConfig()" class="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition flex items-center">
+                配置设置
+            </button>
+        </div>
+    </header>
+
+    <!-- Config Panel (Hidden by default) -->
+    <div id="configPanel" class="hidden bg-white border-b border-gray-200 shadow-inner shrink-0 z-10">
+        <div class="max-w-5xl mx-auto px-4 py-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">OpenAI API Key (or Base URL compatible Key)</label>
+                <input type="password" id="apiKey" class="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 shadow-sm" value="{{ config.api_key }}">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Base URL</label>
+                <input type="text" id="baseUrl" class="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 shadow-sm" value="{{ config.base_url }}">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Model Name</label>
+                <input type="text" id="modelName" class="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 shadow-sm" value="{{ config.model }}">
+            </div>
+            <div class="flex items-center pt-5">
+                <label class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="useEmbedding" class="sr-only peer" {% if config.use_embedding_search %}checked{% endif %}>
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 relative"></div>
+                    <span class="ml-3 text-sm font-medium text-gray-700">启用 Phase 2 向量相似度命中提高准确率</span>
+                </label>
+            </div>
+            <div class="md:col-span-2 flex justify-end">
+                <button onclick="saveConfig()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded shadow transition">保存配置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Chat Area -->
+    <main class="flex-1 overflow-hidden flex flex-col max-w-5xl mx-auto w-full bg-white shadow-xl">
+        <!-- Messages box -->
+        <div id="chatBox" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            <!-- Initial Greeting -->
+            <div class="flex items-start">
+                <div class="flex-shrink-0 bg-blue-100 rounded-full p-2 mt-1">
+                    <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                </div>
+                <div class="ml-3 bg-white border border-gray-200 text-gray-800 p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%]">
+                    您好！我是 On-Call 助手。您可以向我询问如“数据库主从延迟如何处理”或“服务器 OOM 怎么办”等问题。我将查阅 SOP 为您解答。
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 bg-white border-t border-gray-200">
+            <form id="chatForm" class="flex items-end gap-2" onsubmit="sendMessage(event)">
+                <div class="flex-1 relative">
+                    <textarea id="userInput" rows="2" class="w-full resize-none border border-gray-300 rounded-lg p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm" placeholder="输入问题 (Enter 发送，Shift+Enter 换行)..." onkeydown="handleEnter(event)"></textarea>
+                </div>
+                <button type="submit" id="sendBtn" class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition shadow flex-shrink-0 flex items-center justify-center disabled:bg-gray-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                </button>
+            </form>
+        </div>
+    </main>
+
+    <!-- JS Logic -->
+    <script>
+        const chatBox = document.getElementById('chatBox');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const configPanel = document.getElementById('configPanel');
+
+        let messageHistory = [];
+        let isReceiving = false;
+
+        function toggleConfig() {
+            configPanel.classList.toggle('hidden');
+        }
+
+        async function saveConfig() {
+            const config = {
+                api_key: document.getElementById('apiKey').value,
+                base_url: document.getElementById('baseUrl').value,
+                model: document.getElementById('modelName').value,
+                use_embedding_search: document.getElementById('useEmbedding').checked
+            };
+            try {
+                const res = await fetch('/v3/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                if (res.ok) {
+                    alert('配置已保存');
+                    configPanel.classList.add('hidden');
+                }
+            } catch (e) {
+                alert('保存失败: ' + e.message);
+            }
+        }
+
+        function handleEnter(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage(e);
+            }
+        }
+
+        function createMessageElement(isUser, content = "") {
+            const row = document.createElement('div');
+            row.className = `flex items-start ${isUser ? 'justify-end' : ''}`;
+            
+            const avatar = isUser ? "" : `<div class="flex-shrink-0 bg-blue-100 rounded-full p-2 mt-1"><svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"></path><path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"></path></svg></div>`;
+            const wrapperClass = isUser 
+                ? "bg-blue-600 text-white p-3 rounded-2xl rounded-tr-none shadow-sm max-w-[85%] whitespace-pre-wrap ml-12"
+                : "ml-3 bg-white border border-gray-200 text-gray-800 p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%] whitespace-pre-wrap flex flex-col gap-2";
+            
+            const msgBody = document.createElement('div');
+            msgBody.className = wrapperClass;
+            msgBody.textContent = content; // initial text
+
+            row.innerHTML = avatar;
+            if (isUser) {
+                row.appendChild(msgBody);
+            } else {
+                row.appendChild(msgBody);
+            }
+            
+            return { row, msgBody };
+        }
+
+        function createToolCallElement(fname) {
+            const div = document.createElement('div');
+            div.className = "tool-call-badge flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 w-max font-mono mt-1";
+            div.dataset.fname = fname;
+            const spinner = '<svg class="w-3.5 h-3.5 animate-spin text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+            div.innerHTML = spinner + ' <span class="text-amber-600">readFile</span><span class="text-gray-400">("</span><span class="text-amber-800 font-semibold">' + fname + '</span><span class="text-gray-400">")</span> <span class="text-amber-500 ml-1">正在读取…</span>';
+            return div;
+        }
+        
+        function updateToolCallDone(element) {
+            const fname = element.dataset.fname || element.textContent.match(/"([^"]+)"/) && element.textContent.match(/"([^"]+)"/)[1] || "";
+            element.className = "tool-call-badge flex items-center gap-1.5 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 w-max font-mono mt-1";
+            const check = '<svg class="w-3.5 h-3.5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+            element.innerHTML = check + ' <span class="text-green-600">readFile</span><span class="text-gray-400">("</span><span class="text-green-800 font-semibold">' + fname + '</span><span class="text-gray-400">")</span> <span class="text-green-500 ml-1">✓ 已读取</span>';
+        }
+
+        async function sendMessage(e) {
+            if (e) e.preventDefault();
+            if (isReceiving) return;
+            
+            const text = userInput.value.trim();
+            if (!text) return;
+            
+            // Add User message
+            userInput.value = '';
+            const { row: userRow } = createMessageElement(true, text);
+            chatBox.appendChild(userRow);
+            
+            messageHistory.push({ role: 'user', content: text });
+            
+            // Add Agent thinking row
+            const { row: agentRow, msgBody: agentMsgBody } = createMessageElement(false, "");
+            chatBox.appendChild(agentRow);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            
+            sendBtn.disabled = true;
+            isReceiving = true;
+            userInput.placeholder = "Agent 思考中...";
+
+            try {
+                // To do SSE via POST, we can use fetch and body stream reading
+                const response = await fetch('/v3/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: messageHistory })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let currentText = "";
+                let partialChunk = "";
+                
+                // Track active tool call dom element
+                let activeToolElement = null;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    partialChunk += decoder.decode(value, { stream: true });
+                    const lines = partialChunk.split("\n\n");
+                    partialChunk = lines.pop(); // keep the last incomplete chunk
+
+                    for (const line of lines) {
+                        if (!line.startsWith("data: ")) continue;
+                        const dataStr = line.replace("data: ", "").trim();
+                        if (dataStr === "[DONE]") break;
+                        
+                        try {
+                            const data = JSON.parse(dataStr);
+                            
+                            if (data.event === "tool_call") {
+                                // Add tool UI widget
+                                const args = JSON.parse(data.arguments || "{}");
+                                activeToolElement = createToolCallElement(args.fname || 'unknown');
+                                // insert tool ui before any text? or if text exists just append.
+                                // Actually we can just create a wrapper if needed.
+                                agentMsgBody.appendChild(activeToolElement);
+                                chatBox.scrollTop = chatBox.scrollHeight;
+                            } else if (data.event === "tool_result") {
+                                if (activeToolElement) {
+                                    updateToolCallDone(activeToolElement);
+                                    activeToolElement = null;
+                                }
+                            } else if (data.event === "message") {
+                                if (activeToolElement) {
+                                    updateToolCallDone(activeToolElement);
+                                    activeToolElement = null;
+                                }
+                                currentText += data.delta;
+                                // find the text node or create it
+                                let textSpan = agentMsgBody.querySelector('.msg-text');
+                                if (!textSpan) {
+                                    textSpan = document.createElement('span');
+                                    textSpan.className = 'msg-text';
+                                    agentMsgBody.appendChild(textSpan);
+                                }
+                                textSpan.textContent = currentText;
+                                chatBox.scrollTop = chatBox.scrollHeight;
+                            } else if (data.event === "error") {
+                                currentText += `\n[Error: ${data.detail}]\n`;
+                                agentMsgBody.textContent = currentText;
+                            }
+                        } catch (err) {
+                            console.error("Parse JSON stream error:", err, dataStr);
+                        }
+                    }
+                }
+                
+                messageHistory.push({ role: 'assistant', content: currentText });
+                
+            } catch (err) {
+                agentMsgBody.textContent += `\n[通信错误: ${err.message}]`;
+            } finally {
+                isReceiving = false;
+                sendBtn.disabled = false;
+                userInput.placeholder = "输入问题 (Enter 发送，Shift+Enter 换行)...";
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+    </script>
+</body>
+</html>

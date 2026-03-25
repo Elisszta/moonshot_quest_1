@@ -20,7 +20,10 @@ def rerank(query: str, documents: List[Dict], top_k: int = 5) -> List[Dict]:
     docs_to_rerank = documents[:top_k]
     model = get_model()
     
-    sentence_pairs = [[query, doc["text"]] for doc in docs_to_rerank]
+    sentence_pairs = [
+        [query, f"{doc.get('title', '')}\n{doc.get('title', '')}\n{doc.get('title', '')}\n{doc.get('text', '')[:800]}"]
+        for doc in docs_to_rerank
+    ]
     scores = model.predict(sentence_pairs)
     
     for idx, doc in enumerate(docs_to_rerank):
