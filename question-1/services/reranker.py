@@ -1,13 +1,29 @@
+import os
 import torch
 from sentence_transformers import CrossEncoder
 from typing import List, Dict
+
+# Reranker configuration
+MODEL_NAME = 'BAAI/bge-reranker-base'
+MODELS_DIR = os.path.join(os.getcwd(), 'models')
+MODEL_PATH = os.path.join(MODELS_DIR, 'bge-reranker-base')
 
 _model = None
 def get_model():
     global _model
     if _model is None:
         device = "cuda" if torch.cuda.is_available() else ("mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() else "cpu")
-        _model = CrossEncoder('BAAI/bge-reranker-base', device=device)
+        
+        if os.path.exists(MODEL_PATH):
+            print(f"Loading reranker from local: {MODEL_PATH}")
+            _model = CrossEncoder(MODEL_PATH, device=device)
+        else:
+            print(f"Downloading {MODEL_NAME} from HuggingFace...")
+            _model = CrossEncoder(MODEL_NAME, device=device)
+            os.makedirs(MODELS_DIR, exist_ok=True)
+            _model.save(MODEL_PATH)
+            print(f"Reranker saved to: {MODEL_PATH}")
+            
     return _model
 
 def rerank(query: str, documents: List[Dict], top_k: int = 5) -> List[Dict]:

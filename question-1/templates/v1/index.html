@@ -21,7 +21,7 @@
             resultsDiv.innerHTML = '';
             for (const r of data.results) {
                 resultsDiv.innerHTML += `<div>
-                    <h3>${r.title} (${r.id})</h3>
+                    <h3><a href="/data/${r.id}.html" target="_blank" rel="noopener noreferrer">${r.title}</a> (${r.id})</h3>
                     <p>${r.snippet}</p>
                     <small>Score: ${r.score}</small>
                 </div>`;

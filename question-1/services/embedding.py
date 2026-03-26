@@ -5,13 +5,28 @@ from typing import List, Dict, Any
 import pickle
 import os
 
+# Model configuration
+MODEL_NAME = 'BAAI/bge-small-zh-v1.5'
+MODELS_DIR = os.path.join(os.getcwd(), 'models')
+MODEL_PATH = os.path.join(MODELS_DIR, 'bge-small-zh-v1.5')
+
 # Load model lazily
 _model = None
 def get_model():
     global _model
     if _model is None:
         device = "cuda" if torch.cuda.is_available() else ("mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() else "cpu")
-        _model = SentenceTransformer('BAAI/bge-small-zh-v1.5', device=device)
+        
+        if os.path.exists(MODEL_PATH):
+            print(f"Loading embedding model from local: {MODEL_PATH}")
+            _model = SentenceTransformer(MODEL_PATH, device=device)
+        else:
+            print(f"Downloading {MODEL_NAME} from HuggingFace...")
+            _model = SentenceTransformer(MODEL_NAME, device=device)
+            os.makedirs(MODELS_DIR, exist_ok=True)
+            _model.save(MODEL_PATH)
+            print(f"Model saved to: {MODEL_PATH}")
+            
     return _model
 
 def chunk_text(text: str, chunk_size: int = 400, overlap: int = 50) -> List[str]:

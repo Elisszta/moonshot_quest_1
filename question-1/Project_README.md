@@ -23,6 +23,9 @@ pip install -r requirements.txt
 ```bash
 # 启动后默认监听在 http://127.0.0.1:8000
 uv run main.py
+
+# (可选) 预下载模型到本地 models 目录
+uv run download_models.py
 ```
 
 ---
@@ -32,8 +35,8 @@ uv run main.py
 启动服务后，可以通过浏览器访问以下路由：
 
 - **主页控制中心 (`/`)**: 整合了三个阶段的视觉控制面板，提供一键跳转功能。
-- **Phase 1: 基础检索 (`/v1/`)**: 提供纯关键词匹配的搜索页面。
-- **Phase 2: 语义检索 (`/v2/`)**: 展示具备语义理解、重排序及标题增强能力的搜索界面。
+- **Phase 1: 基础检索 (`/v1/`)**: 提供纯关键词匹配的搜索页面，搜索结果标题可点击并在新标签页查看 SOP 文档。
+- **Phase 2: 语义检索 (`/v2/`)**: 展示具备语义理解、重排序及标题增强能力的搜索界面，同样支持文档一键预览。
 - **Phase 3: 智能 Agent (`/v3/`)**: 对话式助手界面，支持查看 Agent 查阅 SOP 的全过程及 SSE 流式反馈。
 
 ---
@@ -62,20 +65,16 @@ uv run main.py
 │   ├── v2/router.py        # Phase 2 语义搜索端点
 │   └── v3/router.py        # Phase 3 Agent 对话与配置端点
 ├── services/               # 业务逻辑层
-│   ├── document_store.py   # 文档内存商店及初始化加载
-│   ├── html_parser.py      # SOP 文档解析服务
-│   ├── search_engine.py    # 混合检索引擎核心算法 (Keyword + RRF)
-│   ├── embedding.py        # 向量存储、BGE 模型推理与持久化 (pkl)
-│   ├── reranker.py         # Cross-Encoder 重排序逻辑
-│   └── agent.py            # Phase 3 Agent 工具调用与 SSE 流式生成器
+│   ├── ...
 ├── templates/              # 前端模板 (Jinja2)
-│   ├── index.html          # 主页控制中心
-│   ├── v1/index.html       # Phase 1 搜索前端
-│   ├── v2/index.html       # Phase 2 搜索前端
-│   └── v3/index.html       # Phase 3 Agent 聊天前端 (支持可视化 Tool Call)
+│   ├── ...
 ├── data/                   # 数据存储
 │   ├── sop-*.html          # 10 份原始文档集
 │   └── vector_store.pkl    # 向量索引持久化文件 (冷启动优化核心)
+├── models/                 # 本地模型仓库
+│   ├── bge-small-zh-v1.5/  # 向量化模型本地持久化
+│   └── bge-reranker-base/  # 重排序模型本地持久化
+├── download_models.py      # 模型预加载/下载工具脚本
 ├── test_suite.py           # API 验证与压力测试套件
 └── test_report.md          # 最终测试评估报告
 ```

@@ -93,8 +93,9 @@ def search_v2(query: str, use_rrf: bool = True, vector_weight: float = 0.8) -> L
     # Extract top 5 for cross-encoder reranking
     reranked = rerank(query, final_candidates, top_k=5)
     
-    # Remove large text field to save bandwidth
+    # Remove internal fields to save bandwidth and align with API spec
     for r in reranked:
         r.pop("text", None)
+        r.pop("rrf_score", None)
         
     return reranked

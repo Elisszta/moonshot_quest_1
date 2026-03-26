@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from contextlib import asynccontextmanager
 from services.document_store import load_initial_data
@@ -22,6 +23,7 @@ templates = Jinja2Templates(directory="templates")
 async def get_home(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
 
+app.mount("/data", StaticFiles(directory="data", html=True), name="data")
 app.include_router(v1_router, prefix="/v1")
 app.include_router(v2_router, prefix="/v2")
 app.include_router(v3_router, prefix="/v3")
